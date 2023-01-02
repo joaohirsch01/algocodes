@@ -1,0 +1,284 @@
+//+------------------------------------------------------------------+
+//|                                     Donchian_Channels_System.mq5 |
+//|                               Copyright © 2013, Nikolay Kositsin | 
+//|                              Khabarovsk,   farria@mail.redcom.ru | 
+//+------------------------------------------------------------------+ 
+#property copyright "Copyright © 2022, JH"
+#property link "jh@gmail.com"
+#property description "Donchian_Channels"
+//---- número da versão do indicador
+#property version   "1.10"
+//---- desenhando o indicador na janela principal
+#property indicator_chart_window
+//---- Nove buffers foram usados ​​para calcular e desenhar o indicador
+#property indicator_buffers 9
+//---- quatro plotagens gráficas usadas
+#property indicator_plots   4
+//+----------------------------------------------+
+//| Parâmetros de desenho do indicador 1         |
+//+----------------------------------------------+
+//---- desenhando o indicador como uma nuvem de uma cor
+#property indicator_type1   DRAW_FILLING
+//---- A cor WhiteSmoke é usada como cor indicadora
+#property indicator_color1  clrWhiteSmoke
+//---- exibindo o rótulo do indicador
+#property indicator_label1  "Donchian_Channels"
+//+----------------------------------------------+
+//| Parâmetros de desenho do indicador 2          | 
+//+----------------------------------------------+
+//---- desenhando o indicador 2 como uma linha
+#property indicator_type2   DRAW_LINE
+//---- A cor MediumSeaGreen é usada como a cor da linha de alta do indicador
+#property indicator_color2  clrMediumSeaGreen
+//---- linha indicadora 2 - curva contínua
+#property indicator_style2  STYLE_SOLID
+//---- a espessura da linha do indicador 2 é igual a 2
+#property indicator_width2  2
+//---- exibir o rótulo do indicador de alta
+#property indicator_label2  "Upper Donchian_Channels"
+//+----------------------------------------------+
+//| Parâmetros de desenho do indicador 3         |
+//+----------------------------------------------+
+//---- desenhando o indicador 3 como uma linha
+#property indicator_type3   DRAW_LINE
+//---- A cor magenta é usada como a cor da linha indicadora de baixa
+#property indicator_color3  clrMagenta
+//---- linha indicadora 3 - curva contínua
+#property indicator_style3  STYLE_SOLID
+//---- a espessura da linha do indicador 3 é igual a 2
+#property indicator_width3  2
+//---- exibindo o rótulo de baixa do indicador
+#property indicator_label3  "Lower Donchian_Channels"
+//+----------------------------------------------+
+//| Parâmetros de desenho do indicador 4         |
+//+----------------------------------------------+
+//---- desenhando o indicador como velas coloridas
+#property indicator_type4 DRAW_COLOR_CANDLES
+//---- usado como cores indicadoras
+#property indicator_color4 clrDeepPink,clrPurple,clrGray,clrMediumBlue,clrDodgerBlue
+//---- linha indicadora - sólida
+#property indicator_style4 STYLE_SOLID
+//---- a espessura da linha do indicador é igual a 2
+#property indicator_width4 2
+//---- exibindo o rótulo do indicador
+#property indicator_label4 "Donchian_Channels_BARS"
+//+----------------------------------------------+
+//| Declaração de enumeração                     |
+//+----------------------------------------------+
+enum Applied_Extrem //Tipo de extremo
+  {
+   HIGH_LOW,
+   HIGH_LOW_OPEN,
+   HIGH_LOW_CLOSE,
+   OPEN_HIGH_LOW,
+   CLOSE_HIGH_LOW
+  };
+//+----------------------------------------------+
+//| Parâmetros de entrada do indicador           |
+//+----------------------------------------------+
+input uint DonchianPeriod=20;           // Média do período
+input Applied_Extrem Extremes=HIGH_LOW; // Tipo de extremo
+input int Margins=-2;
+input uint   Shift=2;                   // mudança de canal horizontal em barras
+//+----------------------------------------------+
+//---- declaração de arrays dinâmicos que estarão em
+// mais usado como buffers de indicador
+double Up1Buffer[],Dn1Buffer[];
+double Up2Buffer[],Dn2Buffer[];
+double ExtOpenBuffer[],ExtHighBuffer[],ExtLowBuffer[],ExtCloseBuffer[],ExtColorBuffer[];
+//---- Declarando variáveis ​​inteiras do ponto de referência de dados
+int min_rates_total;
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+  
+void OnInit()
+  {
+//---- Inicialização de variáveis ​​de origem de dados
+   min_rates_total=int(DonchianPeriod+1+Shift);
+
+//---- transformação de um array dinâmico em um buffer de indicador
+   SetIndexBuffer(0,Up1Buffer,INDICATOR_DATA);
+//---- indexação de elementos no buffer como em uma série temporal
+   ArraySetAsSeries(Up1Buffer,true);
+
+//---- transformação de um array dinâmico em um buffer de indicador
+   SetIndexBuffer(1,Dn1Buffer,INDICATOR_DATA);
+//---- indexação de elementos no buffer como em uma série temporal
+   ArraySetAsSeries(Dn1Buffer,true);
+
+//---- transformação de um array dinâmico em um buffer de indicador
+   SetIndexBuffer(2,Up2Buffer,INDICATOR_DATA);
+//---- indexação de elementos no buffer como em uma série temporal
+   ArraySetAsSeries(Up2Buffer,true);
+
+//---- transformação de um array dinâmico em um buffer de indicador
+   SetIndexBuffer(3,Dn2Buffer,INDICATOR_DATA);
+//---- indexação de elementos no buffer como em uma série temporal
+   ArraySetAsSeries(Dn2Buffer,true);
+
+//---- transformação do array dinâmico IndBuffer em um buffer de indicador
+   SetIndexBuffer(4,ExtOpenBuffer,INDICATOR_DATA);
+   SetIndexBuffer(5,ExtHighBuffer,INDICATOR_DATA);
+   SetIndexBuffer(6,ExtLowBuffer,INDICATOR_DATA);
+   SetIndexBuffer(7,ExtCloseBuffer,INDICATOR_DATA);
+//---- transformação de um array dinâmico em uma cor, buffer de índice
+   ArraySetAsSeries(ExtOpenBuffer,true);
+   ArraySetAsSeries(ExtHighBuffer,true);
+   ArraySetAsSeries(ExtLowBuffer,true);
+   ArraySetAsSeries(ExtCloseBuffer,true);
+
+//---- transformação de um array dinâmico em uma cor, buffer de índice
+   SetIndexBuffer(8,ExtColorBuffer,INDICATOR_COLOR_INDEX);
+//---- indexação de elementos no buffer como em uma série temporal
+   ArraySetAsSeries(ExtColorBuffer,true);
+
+//---- deslocar o indicador 1 horizontalmente por Shift
+   PlotIndexSetInteger(0,PLOT_SHIFT,Shift);
+//---- mudando a origem da renderização do indicador 1 por min_rates_total
+   PlotIndexSetInteger(0,PLOT_DRAW_BEGIN,min_rates_total);
+
+//---- deslocar o indicador 2 horizontalmente por Shift
+   PlotIndexSetInteger(1,PLOT_SHIFT,Shift);
+//---- mudando a origem da renderização do indicador 2 por min_rates_total
+   PlotIndexSetInteger(1,PLOT_DRAW_BEGIN,min_rates_total);
+
+//---- deslocar o indicador 3 horizontalmente por Shift
+   PlotIndexSetInteger(2,PLOT_SHIFT,Shift);
+//---- mudando a origem da renderização do indicador 3 por min_rates_total
+   PlotIndexSetInteger(2,PLOT_DRAW_BEGIN,min_rates_total);
+
+//---- deslocar o indicador 3 horizontalmente por Shift
+   PlotIndexSetInteger(3,PLOT_SHIFT,0);
+//---- mudando a origem da renderização do indicador 4 por min_rates_total
+   PlotIndexSetInteger(3,PLOT_DRAW_BEGIN,min_rates_total);
+//---- definir valores de indicadores que não serão visíveis no gráfico
+   PlotIndexSetDouble(3,PLOT_EMPTY_VALUE,0);
+
+//--- criando um nome para exibição em uma subjanela separada e em uma dica de ferramenta
+   string shortname;
+   StringConcatenate(shortname,"Donchian_Channels(",DonchianPeriod,")");
+//--- criando um nome para exibição em uma subjanela separada e em uma dica de ferramenta
+   IndicatorSetString(INDICATOR_SHORTNAME,shortname);
+//--- determinando a precisão da exibição dos valores do indicador
+   IndicatorSetInteger(INDICATOR_DIGITS,_Digits);
+//----
+  }
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+int OnCalculate(
+                const int rates_total,    // quantidade de histórico em barras no tick atual
+                const int prev_calculated,// quantidade de histórico em barras no tick anterior
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[]
+                )
+  {
+//---- verificando o número de barras para suficiência para cálculo
+   if(rates_total<min_rates_total) return(0);
+
+//---- indexação de elementos em arrays como em timeseries
+   ArraySetAsSeries(open,true);
+   ArraySetAsSeries(close,true);
+   ArraySetAsSeries(high,true);
+   ArraySetAsSeries(low,true);
+
+//---- Declarando variáveis ​​inteiras
+   int limit;
+//---- Declaração de variáveis ​​de ponto flutuante
+   double smin,smax,SsMax=NULL,SsMin=NULL;
+
+//---- cálculo do limite do número inicial para o ciclo de recálculo de barras
+   if(prev_calculated>rates_total || prev_calculated<=0)// verifica o primeiro início do cálculo do indicador
+     {
+      limit=rates_total-min_rates_total; // número inicial para calcular todas as barras
+     }
+   else
+     {
+      limit=rates_total-prev_calculated; // número inicial para calcular novas barras
+     }
+
+//---- ciclo de cálculo do indicador principal
+   for(int bar=limit; bar>=0 && !IsStopped(); bar--)
+     {
+
+      switch(Extremes)
+        {
+         case HIGH_LOW:
+            SsMax=high[ArrayMaximum(high,bar,DonchianPeriod)];
+            SsMin=low[ArrayMinimum(low,bar,DonchianPeriod)];
+            break;
+
+         case HIGH_LOW_OPEN:
+            SsMax=(open[ArrayMaximum(open,bar,DonchianPeriod)]+high[ArrayMaximum(high,bar,DonchianPeriod)])/2;
+            SsMin=(open[ArrayMinimum(open,bar,DonchianPeriod)]+low[ArrayMinimum(low,bar,DonchianPeriod)])/2;
+            break;
+
+         case HIGH_LOW_CLOSE:
+            SsMax=(close[ArrayMaximum(close,bar,DonchianPeriod)]+high[ArrayMaximum(high,bar,DonchianPeriod)])/2;
+            SsMin=(close[ArrayMinimum(close,bar,DonchianPeriod)]+low[ArrayMinimum(low,bar,DonchianPeriod)])/2;
+            break;
+
+         case OPEN_HIGH_LOW:
+            SsMax=open[ArrayMaximum(open,bar,DonchianPeriod)];
+            SsMin=open[ArrayMinimum(open,bar,DonchianPeriod)];
+            break;
+
+         case CLOSE_HIGH_LOW:
+            SsMax=close[ArrayMaximum(close,bar,DonchianPeriod)];
+            SsMin=close[ArrayMinimum(close,bar,DonchianPeriod)];
+            break;
+        }
+
+      smin=SsMin+(SsMax-SsMin)*Margins/100;
+      smax=SsMax-(SsMax-SsMin)*Margins/100;
+
+      Up1Buffer[bar]=smax;
+      Dn1Buffer[bar]=smin;
+      Up2Buffer[bar]=smax;
+      Dn2Buffer[bar]=smin;
+     }
+
+//---- cálculo do limite de número inicial para o ciclo de recalcular barras
+   if(prev_calculated>rates_total || prev_calculated<=0) limit-=int(Shift);
+//---- O loop principal para colorir as barras indicadoras
+   for(int bar=limit; bar>=0 && !IsStopped(); bar--)
+     {
+      int clr=2;
+      ExtOpenBuffer[bar]=0.0;
+      ExtCloseBuffer[bar]=0.0;
+      ExtHighBuffer[bar]=0.0;
+      ExtLowBuffer[bar]=0.0;
+
+      if(close[bar]>Up1Buffer[bar+Shift])
+        {
+         if(open[bar]<=close[bar]) clr=4;
+         else clr=3;
+         ExtOpenBuffer[bar]=open[bar];
+         ExtCloseBuffer[bar]=close[bar];
+         ExtHighBuffer[bar]=high[bar];
+         ExtLowBuffer[bar]=low[bar];
+        }
+
+      if(close[bar]<Dn1Buffer[bar+Shift])
+        {
+         if(open[bar]>close[bar]) clr=0;
+         else clr=1;
+         ExtOpenBuffer[bar]=open[bar];
+         ExtCloseBuffer[bar]=close[bar];
+         ExtHighBuffer[bar]=high[bar];
+         ExtLowBuffer[bar]=low[bar];
+        }
+
+      ExtColorBuffer[bar]=clr;
+     }
+//----     
+   return(rates_total);
+  }
+//+------------------------------------------------------------------+
+Donchian_Channels
