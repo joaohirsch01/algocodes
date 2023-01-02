@@ -1,0 +1,155 @@
+//--- Donchian Channel EA
+
+//+------------------------------------------------------------------+
+//|   INCLUDE                                                        |
+//+------------------------------------------------------------------+
+
+#include <Trade/Trade.mqh>
+
+
+
+//+------------------------------------------------------------------+
+//|   INPUTS                                                         |
+//+------------------------------------------------------------------+
+
+input ENUM_TIMEFRAMES Timeframe = PERIOD_CURRENT;
+
+input double Lots = 0.1;
+
+input int bars_back = 50;
+input int ma_period = 200;
+input ENUM_MA_METHOD      ma_type = MODE_SMA;
+input ENUM_TIMEFRAMES ma_timeframe = PERIOD_CURRENT;
+
+
+
+//+------------------------------------------------------------------+
+//|   CTRADE                                                         |
+//+------------------------------------------------------------------+
+
+CTrade trade;
+
+
+//+------------------------------------------------------------------+
+//|   GLOBAL VARIABLES                                               |
+//+------------------------------------------------------------------+
+
+int handleDc;
+
+int handleMA;
+
+ulong posTicket;
+
+
+
+
+//+------------------------------------------------------------------+
+//|   ON INIT                                                        |
+//+------------------------------------------------------------------+
+
+int OnInit(){
+
+   handleDc = iCustom(_Symbol,PERIOD_CURRENT,"Donchian_Channels_System.ex5",20); 
+   
+   handleMA = iMA(_Symbol, ma_timeframe, ma_period, 0, ma_type, PRICE_CLOSE);
+
+   return(INIT_SUCCEEDED);
+
+  }
+
+
+
+
+
+//+------------------------------------------------------------------+
+//|   ON DEINIT                                                      |
+//+------------------------------------------------------------------+
+
+void OnDeinit(const int reason){
+   
+  }
+
+
+
+
+
+//+------------------------------------------------------------------+
+//|   ON TICK                                                        |
+//+------------------------------------------------------------------+
+
+void OnTick(){
+
+
+
+   double Up1Buffer[];
+   double Dn1Buffer[];
+   CopyBuffer(handleDc,0,0,1,Up1Buffer);
+   CopyBuffer(handleDc,1,0,1,Dn1Buffer);
+
+   double bid = SymbolInfoDouble(_Symbol,SYMBOL_BID);
+   
+   double maPrice01[];
+   double maPrice02[];  
+   CopyBuffer(handleMA,0,0,1,maPrice01);
+   CopyBuffer(handleMA,0,bars_back,1,maPrice02);
+
+   double priceDiff = (maPrice01[0] - maPrice02[0]) / Point();
+   int timeDiff = bars_back * Period();
+   double slope = priceDiff / timeDiff;
+   
+   
+
+   if(bid > Up1Buffer[0]){
+      Print(__FUNCTION__," > Buy signal...");
+
+
+      if(posTicket > 0){
+         if(PositionSelectByTicket(posTicket)){
+            if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL){
+               if(trade.PositionClose(posTicket)){
+                  posTicket = 0;                  
+                            
+               }
+            }
+         }
+      }
+
+      
+
+         if(posTicket<=0 && maPrice01[0]>maPrice02[0]){
+
+            if(trade.Buy(Lots)){
+            posTicket = trade.ResultOrder();
+        
+            }  
+         }       
+      
+
+//---
+
+   }else if(bid <= Dn1Buffer[0]){
+   Print(__FUNCTION__," > Sell signal...");  
+
+
+      if(posTicket > 0){
+         if(PositionSelectByTicket(posTicket)){
+            if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY){
+               if(trade.PositionClose(posTicket)){
+                  posTicket = 0; 
+                                                    
+               }
+            }
+         }
+      }
+
+           
+      if(posTicket <= 0 && maPrice01[0] < maPrice02[0]){
+
+         if(trade.Sell(Lots)){
+         posTicket = trade.ResultOrder();
+         
+         }
+      }      
+   }
+
+}
