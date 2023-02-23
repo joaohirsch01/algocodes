@@ -1,0 +1,98 @@
+//+------------------------------------------------------------------+
+//|                                              TrendlineTrader.mq5 |
+//|                                  Copyright 2022, MetaQuotes Ltd. |
+//|                                             https://www.mql5.com |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2022, MetaQuotes Ltd."
+#property link      "https://www.mql5.com"
+#property version   "1.00"
+
+#include <trade/trade.mqh>
+CTrade trade;
+MqlTradeRequest;
+MqlTradeResult;
+
+input group "==== Lots ===="
+
+input double Lots = 0.01;
+
+input group "==== Trade side: Buy=1 ; Sell=2 ===="
+input int tradedirection = 1;
+
+input group "==== Dual order/tp: 1=No 2=Yes ===="
+input int dualorder = 1;
+
+input group "==== TP/SL info ===="
+input double Tp1InPoints = 600;
+input double Tp2InPoints = 900;
+input double SlInPoints = 350;
+
+
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit(){
+
+   return(INIT_SUCCEEDED);
+  }
+  
+  
+void OnDeinit(const int reason){
+   
+  }
+  
+  
+  
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick(){
+
+   double bid = SymbolInfoDouble(_Symbol,SYMBOL_BID);
+   static double lastBid = bid;
+   
+   double ask = SymbolInfoDouble(_Symbol,SYMBOL_ASK);
+   static double lastAsk = ask;   
+
+   string objName = "trigger";
+   datetime time = TimeCurrent();
+   
+   double price = ObjectGetValueByTime(0,objName,time); 
+   
+   if(tradedirection == 1){
+      if((bid >= price && lastBid < price) || (bid <= price && lastBid > price)){
+      Print("We hit the line, time to open the trade");
+      
+      trade.Buy(Lots,_Symbol,ask,(bid-SlInPoints * _Point),(ask+Tp1InPoints * _Point),NULL);
+         if(dualorder == 2){
+            trade.Buy(Lots,_Symbol,ask,(bid-SlInPoints * _Point),(ask+Tp2InPoints * _Point),NULL);
+         }
+         
+      ExpertRemove();
+   
+      }
+   }
+   
+   if(tradedirection == 2){
+      if((bid >= price && lastBid < price) || (bid <= price && lastBid > price)){
+      Print("We hit the line, time to open the trade");
+      
+      trade.Sell(Lots,_Symbol,bid,(ask+SlInPoints * _Point),(bid-Tp1InPoints * _Point),NULL);
+         if(dualorder == 2){
+            trade.Sell(Lots,_Symbol,bid,(ask+SlInPoints * _Point),(bid-Tp2InPoints * _Point),NULL);
+         }
+         
+      ExpertRemove();
+   
+      }
+   }
+   
+   lastBid = bid;
+   Comment(price,"\n",bid);
+   
+  }
+  
+   
+  
+  
